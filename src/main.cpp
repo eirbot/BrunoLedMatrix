@@ -3,6 +3,13 @@
 
 #define AIMANT 12
 
+//Tailles de l'écran
+#define WIDTH 36
+#define HEIGHT 8
+#define WH8 (WIDTH*HEIGHT/8)
+#define NBLEDS 288
+
+//Tron
 //4 3 1 2
 #define NO_RESPONSE 0
 #define RIGHT 54
@@ -15,11 +22,6 @@
 #define COLOR_ORANGE 0x60FF00
 #define COLOR_GREEN 0xFF0000
 
-#define WIDTH 36
-#define HEIGHT 8
-
-#define NBLEDS 288
-
 #define UP_ACTION 0
 #define DOWN_ACTION 1
 #define RIGHT_ACTION 2
@@ -29,6 +31,7 @@
 
 #define PILE_SIZE 40
 
+//Tetris
 #define WIDTH_T 8
 #define HEIGHT_T 36
 
@@ -40,21 +43,30 @@
 #define FILE 4
 #define PMAX 0
 
+//Life
+//#define LIFE_WARP
+
+
+// Define launch types
+#define LAUNCH_TRON      1
+#define LAUNCH_TETRIS    2
+#define LAUNCH_LIFE      3
+#define LAUNCH_ENDING    4
+
 /**
  * Déclarationd des variables et structures globales
  */
 
-unsigned char walls = 1;
-
-//CRGB leds[NBLEDS];
 CRGBArray<NBLEDS> leds;
-//SoftwareSerial player2(5, 6); // RX, TX
+unsigned long colors[] = {0xFF0000, 0x0000FF, 0x00FF00, 0x00FFFF, 0xFFFF00, 0xFF00FF, 0xFFFFFF};
+char dx[] = {0, 0, 1, -1, -1, 1, -1, 1};
+char dy[] = {-1, 1, 0, 0, -1, -1, 1, 1};
 
+//Tron
+unsigned char walls = 1;
 unsigned char start_x[] = {0, 0};
 unsigned char start_y[] = {0, 0};
 
-char dx[] = {0, 0, 1, -1};
-char dy[] = {-1, 1, 0, 0};
 typedef struct Point Point;
 
 struct Point
@@ -99,13 +111,14 @@ struct Tron
 };
 typedef struct Tron Tron;
 
+//Eirbot
 static uint8_t hue;
 static uint8_t eirbot;
 uint8_t lumi_fond = 0;
 uint8_t lumi_eirbot = 0;
 
+//Tetris
 unsigned char form_file[FILE];
-
 const unsigned int forms2[] = {
 		0b0101100101101010,
 		0b0001010110011101,
@@ -117,15 +130,26 @@ const unsigned int forms2[] = {
 		0b0001010101101010,
 		0b0010010101101001
 };
-unsigned long colors[] = {0xFF0000, 0x0000FF, 0x00FF00, 0x00FFFF, 0xFFFF00, 0xFF00FF, 0xFFFFFF};
-unsigned char grid[PMAX+1][HEIGHT_T];
+unsigned char grid[PMAX + 1][HEIGHT_T];
 int tetrisLoop = 0;
+
+//Life
+unsigned char *grid_life = screen;
+
+
+/**
+ * FONCTIONS GLOBALES
+ */
+
+void setLed(int x, int y, long color);
+void fillScreen(long color);
+unsigned long getLed(int x, int y);
+unsigned char coordOK(int x, int y);
 
 /**
  * FONCTIONS TRON
  */
 
-unsigned char coordOK(int x, int y);
 void clearPile();
 unsigned char isPileVide();
 struct Point pop();
@@ -139,8 +163,6 @@ char getBestAction(Game *game, unsigned char id);
 void initGame2(Game *game, int n, unsigned char x[], unsigned char y[]);
 unsigned char getNextCommandPlayer2();
 unsigned char getNextCommandPlayer1();
-void setLed(int x, int y, long color);
-void fillScreen(long color);
 void setLedTron(int x, int y, long color);
 int getLedTron(int x, int y);
 void clearScreenTron();
@@ -170,7 +192,6 @@ void affichage_fromage();
  * FONCTIONS TETRIS
  */
 
-unsigned long getLed(int x, int y);
 unsigned char outOfScreen(unsigned char x, unsigned char y);
 void setGrid(unsigned char g, unsigned char x, unsigned char y, unsigned long v);
 unsigned long getGrid(unsigned char g, unsigned char x, unsigned char y);
@@ -180,9 +201,20 @@ void getForm(unsigned char id, unsigned char o, char x[4], char y[4]);
 unsigned char formOk(unsigned char g, unsigned char id, unsigned char o, unsigned char x, unsigned char y);
 long printForm(unsigned char g, int id, int o, int x, int y, unsigned long value, unsigned char explode);
 long evaluate2(unsigned char g);
-long brutForce(int prof, unsigned char* xp, unsigned char* yp, unsigned char* op);
+long brutForce(int prof, unsigned char *xp, unsigned char *yp, unsigned char *op);
 void startTetris();
 
+
+/**
+ * FONCTIONS LIFE
+ */
+
+void setGridLife(char x, char y, unsigned char v);
+unsigned char getGridLife(char x, char y);
+void clearLife();
+unsigned char step_life();
+void initLife();
+void startLife();
 
 /**
  * SETUP
@@ -190,7 +222,6 @@ void startTetris();
 
 void setup() {
 	Serial.begin(9600);
-	//player2.begin(9600);
 	FastLED.addLeds<WS2812B, 3/*datapin*/, RGB>(leds, NBLEDS);
 	randomSeed(analogRead(0));
 	hue = 0;
@@ -202,19 +233,40 @@ void setup() {
  * LOOP
  */
 
+char launchType = LAUNCH_TRON; // Démarrage
+
 void loop() {
+
 	if (digitalRead(AIMANT) == 0) {
 
+		// On efface l'écran et on éteint les leds
 		leds.fadeToBlackBy(40);
 		leds = CHSV(0, 255, 0);
-		FastLED.delay(2000);
 
+		// On retest l'état de l'aimant toutes les 2 secondes
+		FastLED.delay(2000);
+		launchType = LAUNCH_TRON; // Démarrage
 	} else {
 
-		launchTron();
-		loop_eirbot();
-		startTetris();
-		loop_eirbot();
+		switch (launchType) {
+			case LAUNCH_TRON:
+				launchTron();
+				loop_eirbot();
+				launchType++;
+				break;
+			case LAUNCH_TETRIS:
+				startTetris();
+				loop_eirbot();
+				launchType++;
+				break;
+			case LAUNCH_LIFE:
+				startLife();
+				loop_eirbot();
+				launchType++;
+				break;
+			default:
+				launchType = LAUNCH_TRON; // On reset le launch type une fois arrivé au bout.
+		}
 
 	}
 }
@@ -224,10 +276,26 @@ void loop() {
  * FONCTIONS
  */
 
-// FONCTIONS TRON
+// FONCTIONS GLOBALES
+void setLed(int x, int y, long color) { //
+	leds[(y + (y % 2)) * WIDTH + (2 * ((y + 1) % 2) - 1) * (x + (y % 2))] = color;
+}
+void fillScreen(long color) { //
+	for (int x = 0; x < 288; x++) {
+		leds[x] = color;
+	}
+	FastLED.show();
+}
+unsigned long getLed(int x, int y) {
+	CRGB v = leds[(y + (y % 2)) * WIDTH + (2 * ((y + 1) % 2) - 1) * (x + (y % 2))];
+	return ((unsigned long) (v.r) << 16) | ((unsigned long) (v.g) << 8) | (unsigned long) (v.b);
+}
 unsigned char coordOK(int x, int y) { //
 	return x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT;
 }
+
+
+// FONCTIONS TRON
 void clearPile() { //
 	pile_debut = pile_fin = 0;
 }
@@ -336,19 +404,10 @@ unsigned char getNextCommandPlayer2() { //
 	return NO_RESPONSE;
 }
 unsigned char getNextCommandPlayer1() { //
-//	if (player2.available() > 0) {
-//		return player2.read();
-//	}
+//  if (player2.available() > 0) {
+//    return player2.read();
+//  }
 	return NO_RESPONSE;
-}
-void setLed(int x, int y, long color) { //
-	leds[(y + (y % 2)) * WIDTH + (2 * ((y + 1) % 2) - 1) * (x + (y % 2))] = color;
-}
-void fillScreen(long color) { //
-	for (int x = 0; x < 288; x++) {
-		leds[x] = color;
-	}
-	FastLED.show();
 }
 void setLedTron(int x, int y, long color) { //
 	screen[x] = (screen[x] & (~(1 << y))) | ((color == COLOR_BLACK ? 0 : 1) << y);
@@ -356,10 +415,6 @@ void setLedTron(int x, int y, long color) { //
 }
 int getLedTron(int x, int y) { //
 	return (screen[x] >> y) & 1;
-}
-unsigned long getLed(int x, int y) {
-	CRGB v = leds[(y+(y%2))*WIDTH + (2*((y+1)%2) -1)*(x+(y%2))];
-	return ((unsigned long)(v.r)<<16) | ((unsigned long)(v.g)<<8) | (unsigned long)(v.b);
 }
 void clearScreenTron() { //
 	for (int i = 0; i < WIDTH; i++) {
@@ -510,14 +565,14 @@ void loop_eirbot() {
 
 	long int lol = random(100);
 
-	if(lol>90){
+	if (lol > 90) {
 		for (int i = 0; i < 40; i++)
 			affichage_fromage();
 		for (int i = 0; i < 20; i++)
 			affichage_cest();
 		for (int i = 0; i < 40; i++)
 			affichage_fromage();
-	} else{
+	} else {
 		for (int i = 0; i < 100; i++)
 			affichage_eirbot();
 	}
@@ -651,9 +706,10 @@ void affichage_eirbot() { //
 	//leds(NUM_LEDS/2,NUM_LEDS-1) = leds(NUM_LEDS/2 - 1 ,0);
 
 	//}
+	FastLED.delay(33);
 
 }
-void affichage_fromage(){
+void affichage_fromage() {
 
 	leds.fadeToBlackBy(40);
 
@@ -785,7 +841,7 @@ void affichage_fromage(){
 
 	FastLED.delay(33);
 }
-void affichage_cest(){
+void affichage_cest() {
 
 	leds.fadeToBlackBy(40);
 
@@ -905,42 +961,42 @@ void setGrid(unsigned char g, unsigned char x, unsigned char y, unsigned long v)
 	if (g == 0) {
 		setLed(y, x, v);
 	} else {
-		grid[g-1][y] = (grid[g-1][y]&(~(1<<x))) | ((v?1:0)<<x);
+		grid[g - 1][y] = (grid[g - 1][y] & (~(1 << x))) | ((v ? 1 : 0) << x);
 	}
 }
 unsigned long getGrid(unsigned char g, unsigned char x, unsigned char y) {
 	if (g == 0) {
 		return getLed(y, x);
 	} else {
-		return (grid[g-1][y]>>x)&1;
+		return (grid[g - 1][y] >> x) & 1;
 	}
 }
 void clearGrid(unsigned char g) {
-	for(unsigned char y = 0; y < HEIGHT_T; y++) {
-		for(unsigned char x = 0; x < WIDTH_T; x++) {
+	for (unsigned char y = 0; y < HEIGHT_T; y++) {
+		for (unsigned char x = 0; x < WIDTH_T; x++) {
 			setGrid(g, x, y, 0);
 		}
 	}
 }
 void copyGrid(unsigned char g0, unsigned char g1) {
-	for(unsigned char y = 0; y < HEIGHT_T; y++) {
-		for(unsigned char x = 0; x < WIDTH_T; x++) {
+	for (unsigned char y = 0; y < HEIGHT_T; y++) {
+		for (unsigned char x = 0; x < WIDTH_T; x++) {
 			setGrid(g0, x, y, getGrid(g1, x, y));
 		}
 	}
 }
 void getForm(unsigned char id, unsigned char o, char x[4], char y[4]) {
-	for(int i = 0; i < 4; i++) {
-		x[i] = (o&2?-1:1)*(((forms2[id]>>((2*i+1-(o&1))<<1))&3)-1);
-		y[i] = ((o&1)^((o&2)>>1)?-1:1)*(((forms2[id]>>((2*i+(o&1))<<1))&3)-1);
+	for (int i = 0; i < 4; i++) {
+		x[i] = (o & 2 ? -1 : 1) * (((forms2[id] >> ((2 * i + 1 - (o & 1)) << 1)) & 3) - 1);
+		y[i] = ((o & 1) ^ ((o & 2) >> 1) ? -1 : 1) * (((forms2[id] >> ((2 * i + (o & 1)) << 1)) & 3) - 1);
 	}
 }
 unsigned char formOk(unsigned char g, unsigned char id, unsigned char o, unsigned char x, unsigned char y) {
 	char fx[4];
 	char fy[4];
 	getForm(id, o, fx, fy);
-	for(unsigned char i = 0; i < 4; i++) {
-		if (x+fx[i] < 0 || x+fx[i] >= WIDTH_T || y+fy[i] < 0 || y+fy[i] >= HEIGHT_T || getGrid(g, x+fx[i], y+fy[i])) {
+	for (unsigned char i = 0; i < 4; i++) {
+		if (x + fx[i] < 0 || x + fx[i] >= WIDTH_T || y + fy[i] < 0 || y + fy[i] >= HEIGHT_T || getGrid(g, x + fx[i], y + fy[i])) {
 			return 0;
 		}
 	}
@@ -951,27 +1007,27 @@ long printForm(unsigned char g, int id, int o, int x, int y, unsigned long value
 	char fy[4];
 	long score = 0;
 	getForm(id, o, fx, fy);
-	for(unsigned char i = 0; i < 4; i++) {
-		if (!(x+fx[i] < 0 || x+fx[i] >= WIDTH_T || y+fy[i] < 0 || y+fy[i] >= HEIGHT_T)) {
-			setGrid(g, x+fx[i], y+fy[i], value);
+	for (unsigned char i = 0; i < 4; i++) {
+		if (!(x + fx[i] < 0 || x + fx[i] >= WIDTH_T || y + fy[i] < 0 || y + fy[i] >= HEIGHT_T)) {
+			setGrid(g, x + fx[i], y + fy[i], value);
 		}
 	}
 	if (explode) {
-		char yplace = HEIGHT_T-1;
-		for(char ys = HEIGHT_T-1; ys >= 0; ys--) {
+		char yplace = HEIGHT_T - 1;
+		for (char ys = HEIGHT_T - 1; ys >= 0; ys--) {
 			unsigned char full = 1;
-			for(char xs = 0; xs < WIDTH_T && full; xs++) {
+			for (char xs = 0; xs < WIDTH_T && full; xs++) {
 				if (!getGrid(g, xs, ys)) {
 					full = 0;
 				}
 			}
 			if (full) {
-				score = score*2+1;
+				score = score * 2 + 1;
 			} else {
 				if (yplace != ys) {
-					for(char xs = 0; xs < WIDTH_T; xs++) {
+					for (char xs = 0; xs < WIDTH_T; xs++) {
 						unsigned long v = getGrid(g, xs, ys);
-						if(v == 1 && g == 0) {
+						if (v == 1 && g == 0) {
 							//v = 0x0000FF;
 							Serial.println("AHAHAHAH");
 						}
@@ -981,8 +1037,8 @@ long printForm(unsigned char g, int id, int o, int x, int y, unsigned long value
 				yplace--;
 			}
 		}
-		for(; yplace >= 0; yplace--) {
-			for(char xs = 0; xs < WIDTH_T; xs++) {
+		for (; yplace >= 0; yplace--) {
+			for (char xs = 0; xs < WIDTH_T; xs++) {
 				setGrid(g, xs, yplace, 0);
 			}
 		}
@@ -991,10 +1047,10 @@ long printForm(unsigned char g, int id, int o, int x, int y, unsigned long value
 }
 long evaluate2(unsigned char g) {
 	long score = 0;
-	for(char x = 0; x < WIDTH_T; x++) {
+	for (char x = 0; x < WIDTH_T; x++) {
 		char y = 0;
-		while(y <= HEIGHT_T && !getGrid(g, x, y))y++;
-		while(y < HEIGHT_T) {
+		while (y <= HEIGHT_T && !getGrid(g, x, y))y++;
+		while (y < HEIGHT_T) {
 			if (getGrid(g, x, y) == 0) {
 				score++;
 			}
@@ -1003,27 +1059,27 @@ long evaluate2(unsigned char g) {
 	}
 	return score;
 }
-long brutForce(int prof, unsigned char* xp, unsigned char* yp, unsigned char* op) {
+long brutForce(int prof, unsigned char *xp, unsigned char *yp, unsigned char *op) {
 	long score = -999999;
 	char bestX = 2;
 	char bestY = 2;
 	char bestO = 0;
 	long ev2_base = evaluate2(prof);
-	for(char x = 0; x < WIDTH_T; x++) {
-		for(char o = 0; o < 4; o++) {
-			copyGrid(prof+1, prof);
+	for (char x = 0; x < WIDTH_T; x++) {
+		for (char o = 0; o < 4; o++) {
+			copyGrid(prof + 1, prof);
 			char y = 2;
-			while(formOk(prof+1, form_file[prof], o, x, y)) y++;
+			while (formOk(prof + 1, form_file[prof], o, x, y)) y++;
 			y--;
 			long s = -1;
-			if (formOk(prof+1, form_file[prof], o, x, y)) {
-				s = printForm(prof+1, form_file[prof], o, x, y, colors[form_file[prof]], 1);
-				long ev2 = evaluate2(prof+1);
-				s = s*100-5*ev2+3*y;
+			if (formOk(prof + 1, form_file[prof], o, x, y)) {
+				s = printForm(prof + 1, form_file[prof], o, x, y, colors[form_file[prof]], 1);
+				long ev2 = evaluate2(prof + 1);
+				s = s * 100 - 5 * ev2 + 3 * y;
 				//if(prof == 0)printf("%d\n", s);
 				if (prof == PMAX) {
-				} else if (ev2_base-ev2 > -2 || 1) {
-					s = s+brutForce(prof+1, xp, yp, op);
+				} else if (ev2_base - ev2 > -2 || 1) {
+					s = s + brutForce(prof + 1, xp, yp, op);
 				}
 
 				if (s > score) {
@@ -1051,22 +1107,22 @@ void startTetris() {
 	unsigned char y = 2;
 	unsigned char forme = 0;
 
-	for(unsigned char i = 0; i < FILE; i++) {
-		form_file[i] = rand()%7;
+	for (unsigned char i = 0; i < FILE; i++) {
+		form_file[i] = rand() % 7;
 	}
 
 	unsigned char event = 0;
 
-	while ( event != EXIT ) {
+	while (event != EXIT) {
 		event = 0;
 
-		if (event == KEY_F && formOk(0, form_file[0], (orientation+3)&3, x, y)) {
-			orientation = (orientation+3)&3;
+		if (event == KEY_F && formOk(0, form_file[0], (orientation + 3) & 3, x, y)) {
+			orientation = (orientation + 3) & 3;
 		}
-		if (event == KEY_LEFT && formOk(0, form_file[0], orientation, x-1, y)) {
+		if (event == KEY_LEFT && formOk(0, form_file[0], orientation, x - 1, y)) {
 			x--;
 		}
-		if (event == KEY_RIGHT && formOk(0, form_file[0], orientation, x+1, y)) {
+		if (event == KEY_RIGHT && formOk(0, form_file[0], orientation, x + 1, y)) {
 			x++;
 		}
 
@@ -1077,27 +1133,114 @@ void startTetris() {
 		y++;
 		if (!formOk(0, forme, orientation, x, y)) {
 			tetrisLoop++;
-			if(tetrisLoop>40){ // Condition d'arrêt pour le moment, pour passer à la suite
-				tetrisLoop=0;
+			if (tetrisLoop > 40) { // Condition d'arrêt pour le moment, pour passer à la suite
+				tetrisLoop = 0;
 				break;
 			}
 			if (y <= 3) { // Si fin du jeu alors
 				break;
 			}
-			printForm(0, forme, orientation, x, y-1, colors[forme], 1);
+			printForm(0, forme, orientation, x, y - 1, colors[forme], 1);
 			FastLED.show();
 			x = 3;
 			y = 2;
 			brutForce(0, &x, &y, &orientation);
 			forme = form_file[0];
-			for(unsigned char i = 0; i < FILE-1; i++) {
-				form_file[i] = form_file[i+1];
+			for (unsigned char i = 0; i < FILE - 1; i++) {
+				form_file[i] = form_file[i + 1];
 			}
-			form_file[FILE-1] = rand()%7;
+			form_file[FILE - 1] = rand() % 7;
 
 			//forme = (forme+1)%7;
 		}
-		delay(10);
+		delay(1);
 	}
 }
 
+
+// FONCTION LIFE
+void setGridLife(char x, char y, unsigned char v) {
+	grid_life[x] = (grid_life[x] & (~(1 << y))) | ((v & 1) << y);
+}
+unsigned char getGridLife(char x, char y) {
+	return (grid_life[x] >> y) & 1;
+}
+void clearLife() {
+	for (unsigned char i = 0; i < WH8; i++) {
+		grid_life[i] = 0;
+	}
+}
+unsigned char step_life() {
+	for (int y = 0; y < HEIGHT; y++) {
+		for (int x = 0; x < WIDTH; x++) {
+			unsigned char c = 0;
+			for (unsigned char i = 0; i < 8; i++) {
+#ifdef LIFE_WARP
+				if (getLed((x+dx[i]+WIDTH)%WIDTH, (y+dy[i]+HEIGHT)%HEIGHT)) {
+				  c++;
+				}
+#else
+				if (coordOK(x + dx[i], y + dy[i]) && getLed(x + dx[i], y + dy[i])) {
+					c++;
+				}
+#endif
+			}
+			if (getLed(x, y)) {
+				setGridLife(x, y, c == 2 || c == 3);
+			} else {
+				setGridLife(x, y, c == 3);
+			}
+		}
+	}
+	unsigned char apparait = 0;
+	for (int y = 0; y < HEIGHT; y++) {
+		for (int x = 0; x < WIDTH; x++) {
+			if (getGridLife(x, y)) {
+				if (!getLed(x, y)) {
+					unsigned long c = 0;
+					while (!c) {
+						char i = rand() % 8;
+						if (coordOK(x + dx[i], y + dy[i]))
+							c = getLed(x + dx[i], y + dy[i]);
+					}
+					setLed(x, y, c);
+					apparait++;
+				}
+			}
+		}
+	}
+	unsigned char disparait = 0;
+	for (int y = 0; y < HEIGHT; y++) {
+		for (int x = 0; x < WIDTH; x++) {
+			if (!getGridLife(x, y)) {
+				if (getLed(x, y))disparait++;
+				setLed(x, y, COLOR_BLACK);
+			}
+		}
+	}
+	return abs(apparait - disparait);
+}
+void initLife() {
+	clearLife();
+	fillScreen(COLOR_BLACK);
+	for (int i = 0; i < 70; i++) {
+		char x = rand() % WIDTH;
+		char y = rand() % HEIGHT;
+		setLed(x, y, colors[rand() % 7]);
+	}
+}
+void startLife() {
+	unsigned long t = millis();
+	unsigned long t2 = millis();
+	initLife();
+	FastLED.show();
+	delay(200);
+	while (millis() - t < 60000 && millis() - t2 < 3000) {
+		unsigned char score = step_life();
+		if (score > 0) {
+			t2 = millis();
+		}
+		FastLED.show();
+		delay(200);
+	}
+}
