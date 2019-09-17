@@ -53,6 +53,12 @@
 #define LAUNCH_LIFE      3
 #define LAUNCH_ENDING    4
 
+#define Xmax 36
+#define nbLettre 6
+#define XLettremax 6
+#define YLettremax 8
+#define nbLed 288
+
 /**
  * Déclarationd des variables et structures globales
  */
@@ -136,6 +142,41 @@ int tetrisLoop = 0;
 //Life
 unsigned char *grid_life = screen;
 
+//Dictionnaire pour defilement
+const PROGMEM int dico[27][6] = {
+		{0b01111110, 0b10010000, 0b10010000, 0b10010000, 0b01111110, 0b00000000},
+		{0b11111110, 0b10010010, 0b10010010, 0b10010010, 0b01111100, 0b00000000},
+		{0b01111100, 0b10000010, 0b10000010, 0b10000010, 0b01000100, 0b00000000},
+		{0b11111110, 0b10000010, 0b10000010, 0b10000010, 0b01111100, 0b00000000},
+		{0b11111110, 0b10010010, 0b10010010, 0b10010010, 0b10000010, 0b00000000},
+		{0b11111110, 0b10010000, 0b10010000, 0b10010000, 0b10000000, 0b00000000},
+		{0b01111100, 0b10000010, 0b10000010, 0b10001010, 0b10001110, 0b00000000},
+		{0b11111110, 0b00010000, 0b00010000, 0b00010000, 0b11111110, 0b00000000},
+		{0b00000000, 0b10000010, 0b11111110, 0b10000010, 0b00000000, 0b00000000},
+		{0b00000100, 0b00000010, 0b10000010, 0b11111100, 0b10000000, 0b00000000},
+		{0b11111110, 0b00010000, 0b00101000, 0b01000100, 0b10000010, 0b00000000},
+		{0b11111110, 0b00000010, 0b00000010, 0b00000010, 0b00000010, 0b00000000},
+		{0b11111110, 0b01100000, 0b00110000, 0b01100000, 0b11111110, 0b00000000},
+		{0b11111110, 0b01100000, 0b00110000, 0b00011000, 0b11111110, 0b00000000},
+		{0b01111100, 0b10000010, 0b10000010, 0b10000010, 0b01111100, 0b00000000},
+		{0b11111110, 0b10010000, 0b10010000, 0b10010000, 0b01100000, 0b00000000},
+		{0b01111100, 0b10000010, 0b10001010, 0b10000100, 0b01111010, 0b00000000},
+		{0b11111110, 0b10010000, 0b10010000, 0b10011000, 0b01100110, 0b00000000},
+		{0b01100100, 0b10010010, 0b10010010, 0b10010010, 0b01001100, 0b00000000},
+		{0b10000000, 0b10000000, 0b11111110, 0b10000000, 0b10000000, 0b00000000},
+		{0b11111100, 0b00000010, 0b00000010, 0b00000010, 0b11111100, 0b00000000},
+		{0b11100000, 0b00111000, 0b00001110, 0b00111000, 0b11100000, 0b00000000},
+		{0b11111000, 0b00001110, 0b00111000, 0b00001110, 0b11111000, 0b00000000},
+		{0b11000110, 0b00101000, 0b00010000, 0b00101000, 0b11000110, 0b00000000},
+		{0b11100000, 0b00010000, 0b00011110, 0b00010000, 0b11100000, 0b00000000},
+		{0b10000110, 0b10001010, 0b10010010, 0b10100010, 0b11000010, 0b00000000},
+		{0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b00000000}
+};
+int temp;
+
+
+
+
 
 /**
  * FONCTIONS GLOBALES
@@ -145,6 +186,14 @@ void setLed(int x, int y, long color);
 void fillScreen(long color);
 unsigned long getLed(int x, int y);
 unsigned char coordOK(int x, int y);
+
+/**
+ * FONCTIONS DEFILEMENT
+ */
+
+void setLedDefil(int x, int y, long color);
+void setText(String text, long color);
+void defilement(String txt, long color, int dt, int pause);
 
 /**
  * FONCTIONS TRON
@@ -566,6 +615,8 @@ void loop_eirbot() {
 	long int lol = random(100);
 
 	if (lol > 90) {
+		defilement("EIRBOT[SUPERIEUR[A[EIRSPACE", 0x505050, 2, 0);
+	} else if (lol > 80) {
 		for (int i = 0; i < 40; i++)
 			affichage_fromage();
 		for (int i = 0; i < 20; i++)
@@ -1242,5 +1293,82 @@ void startLife() {
 		}
 		FastLED.show();
 		delay(200);
+	}
+}
+
+void setLedDefil(int x, int y, long color) {
+	leds[(YLettremax - 1 - y + ((YLettremax - 1 - y) % 2)) * Xmax +
+		 (2 * ((YLettremax - y) % 2) - 1) * ((Xmax - 1 - x) + ((YLettremax - 1 - y) % 2))] = color;
+}
+
+//
+//Mode_1
+//
+
+
+void setText(String text, long color) {
+	String txt = text;
+	txt.toUpperCase();
+	while (txt.length() < 6) {
+		txt += ("[");
+	}
+	for (int i = 0; i < Xmax; i++) {
+		for (int j = 0; j < YLettremax; j++) {
+			temp = pgm_read_word_near(&(dico[txt[i / XLettremax] - 65][i % XLettremax]));
+			setLedDefil(i, j, color * ((temp >> (YLettremax - 1) - j) & 00000001));
+		}
+	}
+	FastLED.show();
+}
+
+
+//
+// Mode_2
+//
+
+void defilement(String txt, long color, int dt, int pause) {
+
+
+	int L = txt.length();
+	int K = Xmax;
+	for (int k = 1; k <= K; k++) {
+		for (int i = Xmax - k; i < Xmax; i++) {
+			for (int j = 0; j < YLettremax; j++) {
+				temp = pgm_read_word_near(&(dico[txt[(i + k - Xmax) / (XLettremax)] - 65][(i + k - Xmax) % XLettremax]));
+				setLedDefil(i, j, color * ((temp >> (YLettremax - 1) - j) & 00000001));
+			}
+		}
+		FastLED.show();
+		delay(dt);
+	}
+
+	delay(pause);
+
+
+	K = L * XLettremax - Xmax;
+
+	for (int k = 1; k <= K; k++) {
+		for (int i = 0; i < Xmax; i++) {
+			for (int j = 0; j < YLettremax; j++) {
+				temp = pgm_read_word_near(&(dico[txt[(i + k) / XLettremax] - 65][(i + k) % XLettremax]));
+				setLedDefil(i, j, color * ((temp >> (YLettremax - 1) - j) & 00000001));
+			}
+		}
+		FastLED.show();
+		delay(dt);
+	}
+
+
+	K = Xmax;
+
+	for (int k = 1; k <= Xmax; k++) {
+		for (int i = 0; i < Xmax - k; i++) {
+			for (int j = 0; j < YLettremax; j++) {
+				temp = pgm_read_word_near(&(dico[txt[L - 6 + ((i + k) / XLettremax)] - 65][(i + k) % XLettremax]));
+				setLedDefil(i, j, color * ((temp >> (YLettremax - 1) - j) & 00000001));
+			}
+		}
+		FastLED.show();
+		delay(dt);
 	}
 }
