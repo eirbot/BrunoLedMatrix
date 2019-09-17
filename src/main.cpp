@@ -191,6 +191,10 @@ unsigned char coordOK(int x, int y);
  * FONCTIONS DEFILEMENT
  */
 
+long couleur = 0xFF0033;
+int i_color = 0;
+
+void switchColor();
 void setLedDefil(int x, int y, long color);
 void setText(String text, long color);
 void defilement(String txt, long color, int dt, int pause);
@@ -614,9 +618,27 @@ void loop_eirbot() {
 
 	long int lol = random(100);
 
-	if (lol > 90) {
-		defilement("EIRBOT[SUPERIEUR[A[EIRSPACE", 0x505050, 2, 0);
-	} else if (lol > 80) {
+	if (lol > 85) {
+		defilement("EIRBOT[SUPERIEUR[A[EIRSPACE", couleur, 2, 0);
+	} else if(lol > 75){
+		setText("OUI", couleur);
+		delay(200);
+		setText("[[[[[[", couleur);
+		switchColor();
+		setText("[OUI", couleur);
+		delay(200);
+		setText("[[[[[[", couleur);
+		switchColor();
+		setText("[[OUI", couleur);
+		delay(200);
+		setText("[[[[[[", couleur);
+		switchColor();
+		setText("[[[OUI", couleur);
+		delay(200);
+		setText("[[[[[[", couleur);
+		switchColor();
+	}
+	else if (lol > 65) {
 		for (int i = 0; i < 40; i++)
 			affichage_fromage();
 		for (int i = 0; i < 20; i++)
@@ -1371,4 +1393,44 @@ void defilement(String txt, long color, int dt, int pause) {
 		FastLED.show();
 		delay(dt);
 	}
+}
+void switchColor() {
+
+	switch (i_color) {
+
+		case 0 :
+			couleur = 0xFF0033;
+			break;
+		case 1 :
+			couleur = 0xCCCC33;
+			break;
+		case 2:
+			couleur = 0x0033FF;
+			break;
+		case 3:
+			couleur = 0x66FF33;
+			break;
+		case 4:
+			couleur = 0x993366;
+			break;
+		case 5:
+			couleur = 0x3300FF;
+			break;
+		case 6:
+			couleur = 0xCC3300;
+			break;
+		case 7:
+			couleur = 0xFF3300;
+			break;
+		case 8:
+			couleur = 0x33FF00;
+			break;
+		case 9:
+			couleur = 0xFF33FF;
+			i_color = 0;
+			break;
+		default:
+			i_color = 0;
+	}
+	i_color++;
 }
